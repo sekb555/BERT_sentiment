@@ -9,6 +9,7 @@ from sklearn.metrics import classification_report
 from custom_dataset import CustomDataset
 
 
+
 class BERT(torch.nn.Module):
 
     def __init__(self):
@@ -25,12 +26,18 @@ class BERT(torch.nn.Module):
 class BertTrain:
 
     def __init__(self):
-        self.model = BERT().to(device)
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
+        print(self.device)
+        self.model = BERT().to(self.device)
         self.max_len = 64
         self.file = "data/processed_data.csv"
         self.epochs = 5
         self.learning_rate = 1e-3
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        
+        self.test_model = BERT().to(self.device)
+        self.test_model.load_state_dict(torch.load("data/bert_model.pth"))
+        self.test_model.eval()
 
     def read_data(self):
         df = pd.read_csv(self.file, encoding="utf-8")
@@ -69,10 +76,10 @@ class BertTrain:
         for epoch in range(self.epochs):
             i = 0
             for batch in (self.train_dataloader):
-                ids = batch["ids"].to(device)
-                mask = batch["mask"].to(device)
-                token_type_ids = batch["token_type_ids"].to(device)
-                targets = batch["targets"].to(device)
+                ids = batch["ids"].to(self.device)
+                mask = batch["mask"].to(self.device)
+                token_type_ids = batch["token_type_ids"].to(self.device)
+                targets = batch["targets"].to(self.device)
 
                 outputs = self.model(ids, mask, token_type_ids)
 
@@ -82,8 +89,7 @@ class BertTrain:
                 loss.backward()
                 optimizer.step()
 
-                if i % 500 == 0:
-                    print("Batch ", i, " Loss: ", loss.item())
+                print("Batch ", i, " Loss: ", loss.item())
                 i += 1
 
             print(f"Epoch {epoch} completed")
@@ -97,20 +103,17 @@ class BertTrain:
         print("Model saved!")
         
     def evaluate_model(self):
-        model = BERT().to(device)
-        model.load_state_dict(torch.load("data/bert_model.pth"))
-        model.eval()
         
         y_true = []
         y_pred = []
         
         for batch in self.test_dataloader:
-                ids = batch["ids"].to(device)
-                mask = batch["mask"].to(device)
-                token_type_ids = batch["token_type_ids"].to(device)
-                targets = batch["targets"].to(device)
+                ids = batch["ids"].to(self.device)
+                mask = batch["mask"].to(self.device)
+                token_type_ids = batch["token_type_ids"].to(self.device)
+                targets = batch["targets"].to(self.device)
                 
-                outputs = self.model(ids, mask, token_type_ids)
+                outputs = self.test_model(ids, mask, token_type_ids)
                 prob = softmax(outputs, dim=1)
                 pred = torch.argmax(prob, dim=1)
                 
@@ -120,14 +123,34 @@ class BertTrain:
         print(classification_report(y_true, y_pred))
         
         
+    def input_predict(self, text):
+        inputs = self.tokenizer.encode_plus(
+            text,
+            None,
+            add_special_tokens=True,
+            max_length=64,
+            padding='max_length',
+            truncation=True,
+            return_token_type_ids=True
+        )
         
-
-if __name__ == '__main__':
-    device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
-    print(device)
-    
+        ids = torch.tensor(inputs["input_ids"]).unsqueeze(0).to(self.device)
+        mask = torch.tensor(inputs["attention_mask"]).unsqueeze(0).to(self.device)
+        token_type_ids = torch.tensor(inputs["token_type_ids"]).unsqueeze(0).to(self.device)        
+        
+        with torch.no_grad():
+            outputs = self.model(ids, mask, token_type_ids)
+            prob = softmax(outputs, dim=1)
+            pred = torch.argmax(prob, dim=1)
+        
+        sentiment = "Positive" if pred.item() == 1 else "Negative"
+        print(f"Prediction: {sentiment} ({pred.item()})")
+            
+            
+            
+if __name__ == '__main__':    
     bert = BertTrain()
     bert.load_data()
-    # bert.train()
-    # bert.save_model()
+    bert.train()
+    bert.save_model()
     bert.evaluate_model()

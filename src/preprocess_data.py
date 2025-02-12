@@ -77,5 +77,6 @@ class PreprocessData:
         print("Data Preprocessing Complete")
 
 
-ppd = PreprocessData()
-ppd.preprocess_trainingdata()
+if __name__ == "__main__":
+    ppd = PreprocessData()
+    ppd.preprocess_trainingdata()
