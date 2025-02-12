@@ -1,42 +1,37 @@
 import numpy as np
 import pandas as pd
-from sklearn import metrics
-from sklearn.metrics import classification_report
-import transformers
 import torch
-from torch.utils.data import Dataset, DataLoader, RandomSampler, SequentialSampler
-from transformers import BertTokenizer, BertModel, BertConfig, AdamW
+from torch.utils.data import DataLoader
+from transformers import BertTokenizer, BertForSequenceClassification
 from custom_dataset import CustomDataset
 
-device = torch.accelerator.current_accelerator(
-).type if torch.accelerator.is_available() else "cpu"
+from sklearn.metrics import classification_report
+
+
+device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
 
 
 class BERT(torch.nn.Module):
 
     def __init__(self):
         super(BERT, self).__init__()
-        self.l1 = BertModel.from_pretrained(
-            "bert-base-uncased", attn_implementation="sdpa")
-        self.l2 = torch.nn.Dropout(0.3)
-        self.l3 = torch.nn.Linear(768, 1)
+        self.model = BertForSequenceClassification.from_pretrained(
+            'bert-base-uncased')
 
     def forward(self, ids, mask, token_type_ids):
-        outputs = self.l1(ids, attention_mask=mask, token_type_ids=token_type_ids)
-        output_1 = outputs.last_hidden_state[:, 0, :]
-        output_2 = self.l2(output_1)
-        output = self.l3(output_2)
-        return output
+        output = self.model(ids, attention_mask=mask,
+                          token_type_ids=token_type_ids)
+        return output.logits
 
 
 class BertTrain:
 
     def __init__(self):
         self.model = BERT().to(device)
-        self.max_len = 100
-        self.file = "data/processed_data_testing.csv"
+        self.max_len = 64
+        self.file = "data/processed_data.csv"
         self.epochs = 1
-        self.learning_rate = 1e-05
+        self.learning_rate = 1e-03
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
     def read_data(self):
@@ -54,12 +49,12 @@ class BertTrain:
         train_set = CustomDataset(train_data, self.tokenizer, self.max_len)
         test_set = CustomDataset(test_data, self.tokenizer, self.max_len)
 
-        train_params = {'batch_size': 32,
+        train_params = {'batch_size': 64,
                         'shuffle': True,
                         'num_workers': 2
                         }
 
-        test_params = {'batch_size': 32,
+        test_params = {'batch_size': 64,
                        'shuffle': True,
                        'num_workers': 2
                        }
@@ -72,7 +67,7 @@ class BertTrain:
         optimizer = torch.optim.AdamW(
             params=self.model.parameters(), lr=self.learning_rate)
         loss_fn = torch.nn.CrossEntropyLoss()
-        
+
         for epoch in range(self.epochs):
             i = 0
             for batch in (self.train_dataloader):
@@ -80,23 +75,30 @@ class BertTrain:
                 mask = batch["mask"].to(device)
                 token_type_ids = batch["token_type_ids"].to(device)
                 targets = batch["targets"].to(device)
-                
+
                 outputs = self.model(ids, mask, token_type_ids)
-                
+
                 optimizer.zero_grad()
                 loss = loss_fn(outputs, targets)
-                
-                optimizer.zero_grad()
+
                 loss.backward()
                 optimizer.step()
-                
-                print("Batch: ", i, " Loss: ", loss.item())
-            
+
+                if i % 500 == 0:
+                    print("Batch: ", i, " Loss: ", loss.item())
+                i += 1
+
             print(f"Epoch {epoch} completed")
-        
-        self.model.eval()    
-                 
+
+        self.model.eval()
+
+    def save_model(self):
+        torch.save(self.model.state_dict(), "data/bert_model.pth")
+        print("Model saved!")
+
+
 if __name__ == '__main__':
     bert = BertTrain()
     bert.load_data()
     bert.train()
+    bert.save_model()
