@@ -1,42 +1,36 @@
-import numpy as np
 import pandas as pd
+import numpy as np
 
-from sklearn import metrics
-import transformers
 import torch
-from torch.utils.data import Dataset, DataLoader, RandomSampler, SequentialSampler
-from transformers import BertTokenizer, BertModel, BertConfig
+from torch.utils.data import Dataset
 
 
+class CustomDataset(Dataset):
 
-class Dataset(Dataset):
-    
     def __init__(self, dataframe, tokenizer, max_len):
         self.tokenizer = tokenizer
-        self.data = dataframe
-        self.comment_text = dataframe.comment_text
-        self.targets = self.data.list
+        self.tweets = dataframe["Processed_Tweets"]
+        self.targets = dataframe["Polarity"]
         self.max_len = max_len
         
     def __len__(self):
-        return len(self.comment_text)
+        return len(self.tweets)
 
     def __getitem__(self, index):
-        comment_text = str(self.comment_text[index])
-        comment_text = " ".join(comment_text.split())
+        tweets = str(self.tweets[index])
 
         inputs = self.tokenizer.encode_plus(
-            comment_text,
+            tweets,
             None,
             add_special_tokens=True,
             max_length=self.max_len,
-            pad_to_max_length=True,
+            padding='max_length',
+            truncation=True,
             return_token_type_ids=True
         )
         ids = inputs['input_ids']
         mask = inputs['attention_mask']
         token_type_ids = inputs["token_type_ids"]
-
 
         return {
             'ids': torch.tensor(ids, dtype=torch.long),
