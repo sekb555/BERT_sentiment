@@ -2,7 +2,10 @@ import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import DataLoader
+from torch.nn.functional import softmax 
 from transformers import BertTokenizer, BertForSequenceClassification
+from sklearn.metrics import classification_report
+
 from custom_dataset import CustomDataset
 
 
@@ -11,7 +14,7 @@ class BERT(torch.nn.Module):
     def __init__(self):
         super(BERT, self).__init__()
         self.model = BertForSequenceClassification.from_pretrained(
-            'bert-base-uncased')
+            'bert-base-uncased', num_labels=2)
 
     def forward(self, ids, mask, token_type_ids):
         output = self.model(ids, attention_mask=mask,
@@ -93,14 +96,38 @@ class BertTrain:
         torch.save(self.model.state_dict(), "data/bert_model.pth")
         print("Model saved!")
         
+    def evaluate_model(self):
+        model = BERT().to(device)
+        model.load_state_dict(torch.load("data/bert_model.pth"))
+        model.eval()
+        
+        y_true = []
+        y_pred = []
+        
+        for batch in self.test_dataloader:
+                ids = batch["ids"].to(device)
+                mask = batch["mask"].to(device)
+                token_type_ids = batch["token_type_ids"].to(device)
+                targets = batch["targets"].to(device)
+                
+                outputs = self.model(ids, mask, token_type_ids)
+                prob = softmax(outputs, dim=1)
+                pred = torch.argmax(prob, dim=1)
+                
+                y_true.extend(targets.cpu().numpy())
+                y_pred.extend(pred.cpu().numpy())
+                
+        print(classification_report(y_true, y_pred))
+        
+        
+        
 
-        
-        
 if __name__ == '__main__':
     device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
     print(device)
     
     bert = BertTrain()
     bert.load_data()
-    bert.train()
-    bert.save_model()
+    # bert.train()
+    # bert.save_model()
+    bert.evaluate_model()
