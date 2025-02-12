@@ -5,11 +5,6 @@ from torch.utils.data import DataLoader
 from transformers import BertTokenizer, BertForSequenceClassification
 from custom_dataset import CustomDataset
 
-from sklearn.metrics import classification_report
-
-
-device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
-
 
 class BERT(torch.nn.Module):
 
@@ -30,8 +25,8 @@ class BertTrain:
         self.model = BERT().to(device)
         self.max_len = 64
         self.file = "data/processed_data.csv"
-        self.epochs = 1
-        self.learning_rate = 1e-03
+        self.epochs = 5
+        self.learning_rate = 1e-3
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
     def read_data(self):
@@ -49,12 +44,12 @@ class BertTrain:
         train_set = CustomDataset(train_data, self.tokenizer, self.max_len)
         test_set = CustomDataset(test_data, self.tokenizer, self.max_len)
 
-        train_params = {'batch_size': 64,
+        train_params = {'batch_size': 32,
                         'shuffle': True,
                         'num_workers': 2
                         }
 
-        test_params = {'batch_size': 64,
+        test_params = {'batch_size': 32,
                        'shuffle': True,
                        'num_workers': 2
                        }
@@ -85,19 +80,26 @@ class BertTrain:
                 optimizer.step()
 
                 if i % 500 == 0:
-                    print("Batch: ", i, " Loss: ", loss.item())
+                    print("Batch ", i, " Loss: ", loss.item())
                 i += 1
 
             print(f"Epoch {epoch} completed")
-
+            
         self.model.eval()
+
+        
 
     def save_model(self):
         torch.save(self.model.state_dict(), "data/bert_model.pth")
         print("Model saved!")
+        
 
-
+        
+        
 if __name__ == '__main__':
+    device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
+    print(device)
+    
     bert = BertTrain()
     bert.load_data()
     bert.train()

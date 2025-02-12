@@ -55,6 +55,10 @@ class PreprocessData:
 
         df.drop(columns=["ID", "Flag", "User", "Date"], inplace=True)
 
+        df1 = df.head(256)
+        df2 = df.tail(256)
+        df = pd.concat([df1, df2])
+        
         # assign text and sentiment to variables
         twts = df["Tweet"]
         sentiments = df["Polarity"]
