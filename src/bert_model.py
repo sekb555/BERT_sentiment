@@ -50,12 +50,12 @@ class BertTrain:
         train_set = CustomDataset(train_data, self.tokenizer, self.max_len)
         test_set = CustomDataset(test_data, self.tokenizer, self.max_len)
 
-        train_params = {'batch_size': 32,
+        train_params = {'batch_size': 16,
                         'shuffle': True,
                         'num_workers': 2
                         }
 
-        test_params = {'batch_size': 32,
+        test_params = {'batch_size': 16,
                        'shuffle': True,
                        'num_workers': 2
                        }
@@ -97,6 +97,9 @@ class BertTrain:
         print("Model saved!")
 
     def evaluate_model(self):
+        self.test_model = BERT().to(self.device)
+        self.test_model.load_state_dict(torch.load("data/bert_model.pth"))
+        self.test_model.eval()
 
         y_true = []
         y_pred = []
@@ -117,7 +120,6 @@ class BertTrain:
         print(classification_report(y_true, y_pred))
 
     def input_predict(self, text):
-
         self.test_model = BERT().to(self.device)
         self.test_model.load_state_dict(torch.load("data/bert_model.pth"))
         self.test_model.eval()

@@ -8,6 +8,7 @@ while(1):
     if text == '':
         break
     else:
-        ppd = preprocess_data.PreprocessData(str(text))
+        ppd = preprocess_data.PreprocessData()
+        text = ppd.preprocess_text(str(text))
         bert.input_predict(text)
 
