@@ -119,11 +119,10 @@ class BertTrain:
 
         print(classification_report(y_true, y_pred))
 
-    def input_predict(self, text):
-        self.test_model = BERT().to(self.device)
-        self.test_model.load_state_dict(torch.load("data/bert_model.pth"))
-        self.test_model.eval()
-
+    def input_predict(self, text, test_model):
+        test_model = BERT().to(self.device)
+        test_model.eval()
+        
         inputs = self.tokenizer.encode_plus(
             text,
             None,
@@ -141,12 +140,18 @@ class BertTrain:
             inputs["token_type_ids"]).unsqueeze(0).to(self.device)
 
         with torch.no_grad():
-            outputs = self.model(ids, mask, token_type_ids)
-            prob = softmax(outputs, dim=1)
-            pred = torch.argmax(prob, dim=1)
+            output = test_model(ids, mask, token_type_ids)
+            prob = softmax(output, dim=1)
 
-        sentiment = "Positive" if pred.item() == 1 else "Negative"
-        print(f"Prediction: {sentiment} ({pred.item()})")
+        print(prob[0][0])
+        print(prob[0][1])
+        if abs(prob[0][0]-prob[0][1]) < 0.2:
+            sentiment = "Neutral"
+        elif prob[0][0] > prob[0][1]:
+            sentiment = "Negative"
+        elif prob[0][0] < prob[0][1]:
+            sentiment = "Positive"
+        return sentiment
 
 
 if __name__ == '__main__':
