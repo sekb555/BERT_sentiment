@@ -24,15 +24,15 @@ class BERT(torch.nn.Module):
 
 class BertTrain:
 
-    def __init__(self):
+    def __init__(self, max_len = 64, epochs = 1, learning_rate = 1e-3):
         self.device = torch.accelerator.current_accelerator(
         ).type if torch.accelerator.is_available() else "cpu"
         print(self.device)
         self.model = BERT().to(self.device)
-        self.max_len = 64
+        self.max_len = max_len
         self.file = "data/processed_data.csv"
-        self.epochs = 1
-        self.learning_rate = 1e-3
+        self.epochs = epochs
+        self.learning_rate = learning_rate
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
     def read_data(self):
